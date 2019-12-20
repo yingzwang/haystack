@@ -6,3 +6,6 @@ flask_sqlalchemy
 pandas
 psycopg2-binary
 sklearn
+
+# [optional] for fasttext retriever
+fasttext==0.9.1

@@ -61,6 +61,9 @@ class FARMReader:
         # remove all null answers (where an answers in not found in the text)
         all_answers = [ans for ans in all_answers if ans["answer"]]
 
+
+        # TODO need to find a better way to convert logit scores to probabilities
+        # For now this hack makes the numbers look like probabilities
         scores = np.asarray([ans["score"] for ans in all_answers])
         probabilities = expit(scores / 8)
         for ans, prob in zip(all_answers, probabilities):
