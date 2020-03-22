@@ -184,12 +184,17 @@ class ElasticsearchDocumentStore(BaseDocumentStore):
             }
 
             if candidate_doc_ids:
-                body["query"]["bool"]["filter"] = [{"terms": {"_id": candidate_doc_ids}}]
+                # body["query"]["script_score"]["query"]["filter"] = [{"terms": {"_id": candidate_doc_ids}}]
+                body["query"]["script_score"]["query"] = {
+                    "bool": {
+                        "should": [{"match_all": {}}],
+                        "filter": [{"terms": {"_id": candidate_doc_ids}}]
+                }}
 
             if self.excluded_meta_data:
                 body["_source"] = {"excludes": self.excluded_meta_data}
 
-            logger.debug(f"Retriever query: {body}")
+            logger.debug(f"Retriever query:{body}")
             result = self.client.search(index=self.index, body=body)["hits"]["hits"]
             paragraphs = []
             meta_data = []
