@@ -5,16 +5,15 @@ import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 
-from farm.infer import Inferencer
-
 from haystack.document_store.base import BaseDocumentStore
 from haystack import Document
 from haystack.document_store.elasticsearch import ElasticsearchDocumentStore
 from haystack.retriever.base import BaseRetriever
 from haystack.retriever.sparse import logger
 
-from transformers.modeling_dpr import DPRContextEncoder, DPRQuestionEncoder
-from transformers.tokenization_dpr import DPRContextEncoderTokenizer, DPRQuestionEncoderTokenizer
+from farm.infer import Inferencer
+from farm.modeling.tokenization import Tokenizer
+from farm.modeling.language_model import LanguageModel
 from farm.modeling.biadaptive_model import BiAdaptiveModel
 from farm.modeling.prediction_head import TextSimilarityHead
 from farm.data_handler.processor import TextSimilarityProcessor
@@ -41,11 +40,12 @@ class DensePassageRetriever(BaseRetriever):
                  document_store: BaseDocumentStore,
                  query_embedding_model: str = "facebook/dpr-question_encoder-single-nq-base",
                  passage_embedding_model: str = "facebook/dpr-ctx_encoder-single-nq-base",
-                 max_seq_len: int = 256,
+                 max_seq_len_query: int = 256,
+                 max_seq_len_context: int = 256,
                  use_gpu: bool = True,
                  batch_size: int = 16,
                  embed_title: bool = True,
-                 remove_sep_tok_from_untitled_passages: bool = True
+                 num_hard_negatives: int = 0
                  ):
         """
         Init the Retriever incl. the two encoder models from a local or remote model checkpoint.
@@ -58,7 +58,8 @@ class DensePassageRetriever(BaseRetriever):
         :param passage_embedding_model: Local path or remote name of passage encoder checkpoint. The format equals the
                                         one used by hugging-face transformers' modelhub models
                                         Currently available remote names: ``"facebook/dpr-ctx_encoder-single-nq-base"``
-        :param max_seq_len: Longest length of each sequence
+        :param max_seq_len_query: Longest length of each query sequence
+        :param max_seq_len_context: Longest length of each passage/context sequence
         :param use_gpu: Whether to use gpu or not
         :param batch_size: Number of questions or passages to encode at once
         :param embed_title: Whether to concatenate title and passage to a text pair that is then used to create the embedding.
@@ -67,14 +68,15 @@ class DensePassageRetriever(BaseRetriever):
                             The title is expected to be present in doc.meta["name"] and can be supplied in the documents
                             before writing them to the DocumentStore like this:
                             {"text": "my text", "meta": {"name": "my title"}}.
-        :param remove_sep_tok_from_untitled_passages: If embed_title is ``True``, there are different strategies to deal with documents that don't have a title.
-        If this param is ``True`` => Embed passage as single text, similar to embed_title = False (i.e [CLS] passage_tok1 ... [SEP]).
-        If this param is ``False`` => Embed passage as text pair with empty title (i.e. [CLS] [SEP] passage_tok1 ... [SEP])
+        :param num_hard_negatives: number of hard_negative Documents to include with each sample. Useful only
+                            during training where each sample consists of a positive passage and hard_negative passages
         """
 
         self.document_store = document_store
         self.batch_size = batch_size
-        self.max_seq_len = max_seq_len
+        self.max_seq_len_context = max_seq_len_context
+        self.max_seq_len_query = max_seq_len_query
+        self.num_hard_negatives = num_hard_negatives
 
         if use_gpu and torch.cuda.is_available():
             self.device = torch.device("cuda")
@@ -82,14 +84,40 @@ class DensePassageRetriever(BaseRetriever):
             self.device = torch.device("cpu")
 
         self.embed_title = embed_title
-        self.remove_sep_tok_from_untitled_passages = remove_sep_tok_from_untitled_passages
 
         # Init & Load Encoders
-        self.query_tokenizer = DPRQuestionEncoderTokenizer.from_pretrained(query_embedding_model)
-        self.query_encoder = DPRQuestionEncoder.from_pretrained(query_embedding_model).to(self.device)
+        self.query_tokenizer = Tokenizer.load(pretrained_model_name_or_path=query_embedding_model,
+                                         do_lower_case=True, use_fast=True)
+        self.query_encoder = LanguageModel.load(pretrained_model_name_or_path=query_embedding_model,
+                                                     language_model_class="DPRQuestionEncoder")
 
-        self.passage_tokenizer = DPRContextEncoderTokenizer.from_pretrained(passage_embedding_model)
-        self.passage_encoder = DPRContextEncoder.from_pretrained(passage_embedding_model).to(self.device)
+        self.passage_tokenizer = Tokenizer.load(pretrained_model_name_or_path=passage_embedding_model,
+                                           do_lower_case=True, use_fast=True)
+        self.passage_encoder = LanguageModel.load(pretrained_model_name_or_path=passage_embedding_model,
+                                                    language_model_class="DPRContextEncoder")
+
+        self.label_list = ["hard_negative", "positive"]
+        self.processor = TextSimilarityProcessor(tokenizer=self.query_tokenizer,
+                                            passage_tokenizer=self.passage_tokenizer,
+                                            max_seq_len_context=self.max_seq_len_context,
+                                            max_seq_len_query=self.max_seq_len_query,
+                                            label_list=self.label_list,
+                                            metric="text_similarity_metric",
+                                            embed_title=self.embed_title,
+                                            num_hard_negatives=self.num_hard_negatives,
+                                            num_negatives=0)
+
+        #prediction_head = TextSimilarityHead(similarity_function="text_similarity_function")
+        self.model = BiAdaptiveModel(
+            language_model1=self.query_encoder,
+            language_model2=self.passage_encoder,
+            #prediction_heads=[prediction_head],
+            embeds_dropout_prob=0.1,
+            lm1_output_types=["per_sequence"],
+            lm2_output_types=["per_sequence"],
+            device=self.device,
+        )
+        #self.model.connect_heads_with_processor(self.processor.tasks, require_labels=False)
 
     def retrieve(self, query: str, filters: dict = None, top_k: int = 10, index: str = None) -> List[Document]:
         if index is None:
@@ -98,7 +126,7 @@ class DensePassageRetriever(BaseRetriever):
         documents = self.document_store.query_by_embedding(query_emb=query_emb[0], top_k=top_k, filters=filters, index=index)
         return documents
 
-    def _get_predictions(self, dicts):
+    def _get_predictions(self, dicts, tokenizer):
         """
         Feed a preprocessed dataset to the model and get the actual predictions (forward pass + formatting).
 
@@ -109,7 +137,6 @@ class DensePassageRetriever(BaseRetriever):
                         Example: QA - input string to convert the predicted answer from indices back to string space
         :return: list of predictions
         """
-
         dataset, tensor_names, baskets = self.processor.dataset_from_dicts(
             dicts, indices=[i for i in range(len(dicts))], return_baskets=True
         )
@@ -119,22 +146,28 @@ class DensePassageRetriever(BaseRetriever):
         data_loader = NamedDataLoader(
             dataset=dataset, sampler=SequentialSampler(dataset), batch_size=self.batch_size, tensor_names=tensor_names
         )
-        preds_all = []
-        for i, batch in enumerate(tqdm(data_loader, desc=f"Inferencing Samples", unit=" Batches", disable=self.disable_tqdm)):
+        #preds_all = []
+        all_embeddings = {}
+        for i, batch in enumerate(tqdm(data_loader, desc=f"Inferencing Samples", unit=" Batches", disable=False)):
             batch = {key: batch[key].to(self.device) for key in batch}
             batch_samples = samples[i * self.batch_size : (i + 1) * self.batch_size]
 
             # get logits
             with torch.no_grad():
                 out = self.model.forward(**batch)[0]
+                for k, v in out.items():
+                    all_embeddings[k] = torch.cat(
+                        (all_embeddings.get(k, torch.tensor([])), out[k]), dim=0)
+                """
                 preds = self.model.formatted_preds(
                     logits=[out],
                     samples=batch_samples,
-                    tokenizer=self.processor.tokenizer,
+                    tokenizer=tokenizer,
                     return_class_probs=self.return_class_probs,
                     **batch)
                 preds_all += preds
-        return out
+                """
+        return all_embeddings
 
     def embed_queries(self, texts: List[str]) -> List[np.array]:
         """
@@ -144,7 +177,7 @@ class DensePassageRetriever(BaseRetriever):
         :return: Embeddings, one per input queries
         """
         queries = [{'query': q} for q in texts]
-        result = self._get_predictions(queries)["query"]
+        result = self._get_predictions(queries, self.query_tokenizer)["query"]
         return result
 
     def embed_passages(self, docs: List[Document]) -> List[np.array]:
@@ -154,56 +187,18 @@ class DensePassageRetriever(BaseRetriever):
         :param docs: List of Document objects used to represent documents / passages in a standardized way within Haystack.
         :return: Embeddings of documents / passages shape (batch_size, embedding_dim)
         """
-        passages = [{"title": d.meta["name"] if d.meta and "name" in d.meta else "",
-                     "text":d.text,
-                     "label":d.meat["label"] if d.meta and "label" in d.meta else "positive",
-                     "external_id":d.id,
+        passages = [{'passages': [{
+                                "title": d.meta["name"] if d.meta and "name" in d.meta else "",
+                                "text":d.text,
+                                "label":d.meat["label"] if d.meta and "label" in d.meta else "positive",
+                                "external_id":d.id}]
                     } for d in docs]
-        embeddings = self._get_predictions(passages)["passages"]
+        embeddings = self._get_predictions(passages, self.passage_tokenizer)["passages"]
 
         return embeddings
 
-    def _normalize_query(self, query: str) -> str:
-        if query[-1] == '?':
-            query = query[:-1]
-        return query
-
-    def _tensorizer(self, tokenizer: Union[DPRQuestionEncoderTokenizer, DPRContextEncoderTokenizer],
-                    text: List[str],
-                    title: Optional[List[str]] = None,
-                    add_special_tokens: bool = True):
-        """
-        Creates tensors from text sequences
-        :Example:
-            >>> ctx_tokenizer = DPRContextEncoderTokenizer.from_pretrained()
-            >>> dpr_object._tensorizer(tokenizer=ctx_tokenizer, text=passages, title=titles)
-
-        :param tokenizer: An instance of DPRQuestionEncoderTokenizer or DPRContextEncoderTokenizer.
-        :param text: list of text sequences to be tokenized
-        :param title: optional list of titles associated with each text sequence
-        :param add_special_tokens: boolean for whether to encode special tokens in each sequence
-
-        Returns:
-                token_ids: list of token ids from vocabulary
-                token_type_ids: list of token type ids
-                attention_mask: list of indices specifying which tokens should be attended to by the encoder
-        """
-
-        # combine titles with passages only if some titles are present with passages
-        if self.embed_title and title:
-            final_text = [tuple((title_, text_)) for title_, text_ in zip(title, text)] #type: Union[List[Tuple[str, ...]], List[str]]
-        else:
-            final_text = text
-        out = tokenizer.batch_encode_plus(final_text, add_special_tokens=add_special_tokens, truncation=True,
-                                              max_length=self.max_seq_len,
-                                              pad_to_max_length=True)
-
-        token_ids = torch.tensor(out['input_ids']).to(self.device)
-        token_type_ids = torch.tensor(out['token_type_ids']).to(self.device)
-        attention_mask = torch.tensor(out['attention_mask']).to(self.device)
-        return token_ids, token_type_ids, attention_mask
-
     def train(self,
+              data_dir="",
               train_filename="",
               dev_filename=None,
               test_filename=None,
@@ -220,17 +215,18 @@ class DensePassageRetriever(BaseRetriever):
               save_dir="../saved_models/dpr-tutorial",
               ):
 
-        processor = TextSimilarityProcessor(tokenizer=self.query_tokenizer,
+        self.processor = TextSimilarityProcessor(tokenizer=self.query_tokenizer,
                                             passage_tokenizer=self.passage_tokenizer,
-                                            max_seq_len=self.max_seq_len,
-                                            label_list=label_list,
-                                            metric=metric,
-                                            data_dir="/home/ubuntu/DPR/data/data/retriever",
+                                            max_seq_len_context=self.max_seq_len_context,
+                                            max_seq_len_query=self.max_seq_len_query,
+                                            label_list=self.label_list,
+                                            metric="text_similarity_metric",
+                                            data_dir=data_dir,
                                             train_filename=train_filename,
                                             dev_filename=dev_filename,
                                             test_filename=dev_filename,
                                             embed_title=embed_title,
-                                            num_hard_negatives=num_hard_negatives)
+                                            num_hard_negatives=self.num_hard_negatives)
 
         prediction_head = TextSimilarityHead(similarity_function=similarity_function)
         bi_model = BiAdaptiveModel(
@@ -242,9 +238,9 @@ class DensePassageRetriever(BaseRetriever):
             lm2_output_types=["per_sequence"],
             device=self.device,
         )
-        bi_model.connect_heads_with_processor(processor.tasks, require_labels=True)
+        bi_model.connect_heads_with_processor(self.processor.tasks, require_labels=True)
 
-        data_silo = DataSilo(processor=processor, batch_size=batch_size, distributed=False)
+        data_silo = DataSilo(processor=self.processor, batch_size=batch_size, distributed=False)
 
         # 5. Create an optimizer
         model, optimizer, lr_schedule = initialize_optimizer(
@@ -276,7 +272,7 @@ class DensePassageRetriever(BaseRetriever):
 
         save_dir = Path(save_dir)
         model.save(save_dir)
-        processor.save(save_dir)
+        self.processor.save(save_dir)
 
         self.query_encoder = bi_model.language_model1
         self.passage_encoder = bi_model.language_model2
@@ -390,3 +386,4 @@ class EmbeddingRetriever(BaseRetriever):
         texts = [d.text for d in docs]
 
         return self.embed(texts)
+
