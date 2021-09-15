@@ -21,6 +21,10 @@ pip install -r requirements.txt
 **Get Elasticsearch Docker image (empty instance)**
 ```bash
 docker pull docker.elastic.co/elasticsearch/elasticsearch:7.9.2
+```
+
+**Run Elasticsearch container (with empty instance)**
+```bash
 docker run -dp 9200:9200 -e "discovery.type=single-node" elasticsearch:7.9.2
 ```
 
