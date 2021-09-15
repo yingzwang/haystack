@@ -36,7 +36,7 @@ gunicorn rest_api.application:app -b 0.0.0.0:8000 -k uvicorn.workers.UvicornWork
 
 #### Start UI
 ```bash
-streamlit run webapp.py
+streamlit run ./ui/webapp.py
 ```
 
 **Note**: We use following ports
