@@ -2,13 +2,13 @@
 
 Run Haystack quick demo in local conda environment.
 
-**1. Create conda environment**
+**Create conda environment**
 ```bash
 conda create -n haystack-dev python=3.7.4    
 conda activate haystack-dev
 ```
 
-**2. Install dependencies**
+**Install dependencies**
 ```bash
 git clone https://github.com/deepset-ai/haystack.git
 cd haystack
@@ -18,18 +18,23 @@ pip install -e .
 cd ui
 pip install -r requirements.txt
 ```
+**Get Elasticsearch Docker image (empty instance)**
+```bash
+docker pull docker.elastic.co/elasticsearch/elasticsearch:7.9.2
+docker run -dp 9200:9200 -e "discovery.type=single-node" elasticsearch:7.9.2
+```
 
-**3. Run Elasticsearch container (with Game of Thrones articles)**
+**Run Elasticsearch container (with Game of Thrones articles)**
 ```bash
 docker run -dp 9200:9200 -e "discovery.type=single-node" deepset/elasticsearch-game-of-thrones
 ```
 
-**4. Run Haystack API**
+**Run Haystack API**
 ```bash
 gunicorn rest_api.application:app -b 0.0.0.0:8000 -k uvicorn.workers.UvicornWorker -t 300
 ```
 
-**5. Start UI**
+**Start UI**
 ```bash
 streamlit run webapp.py
 ```
