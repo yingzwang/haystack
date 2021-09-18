@@ -19,14 +19,15 @@ cd ui
 pip install -r requirements.txt
 ```
 
-#### Run Elasticsearch container (with empty instance)
+#### Run Elasticsearch with docker container (optional)
 ```bash
 docker run -dp 9200:9200 -e "discovery.type=single-node" elasticsearch:7.9.2
+docker run -dp 9200:9200 -e "discovery.type=single-node" deepset/elasticsearch-game-of-thrones
 ```
 
-#### Run Elasticsearch container (with Game of Thrones articles)
+#### Run Elasticsearch and load documents locally
 ```bash
-docker run -dp 9200:9200 -e "discovery.type=single-node" deepset/elasticsearch-game-of-thrones
+python ./demo-yw/run_elasticsearch.py
 ```
 
 #### Run Haystack API
