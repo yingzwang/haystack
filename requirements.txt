@@ -5,6 +5,7 @@ uvicorn
 gunicorn
 pandas
 sklearn
+absl-py
 psycopg2-binary; sys_platform != 'win32' and sys_platform != 'cygwin'
 elasticsearch>=7.7,<=7.10
 elastic-apm
