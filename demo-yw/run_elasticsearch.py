@@ -9,12 +9,13 @@ from absl.flags import FLAGS
 flags.DEFINE_string('doc_dir', './data/ziggo_wifi_en', 'Directory of documents (txt files)')
 
 
-def start_elasticsearch(docs: List[dict]):
+def start_elasticsearch(docs: List[dict] = None):
     """start elasticsearch and write documents to it
     """
     launch_es()
     document_store = ElasticsearchDocumentStore(host="localhost", username="", password="", index="document")
-    document_store.write_documents(docs)
+    if docs is not None:
+        document_store.write_documents(docs)
     return document_store
 
 
