@@ -7,16 +7,7 @@ from haystack.utils import launch_es
 from absl import app, flags, logging
 from absl.flags import FLAGS
 flags.DEFINE_string('doc_dir', './data/ziggo_wifi_en', 'Directory of documents (txt files)')
-
-
-def start_elasticsearch(docs: List[dict] = None):
-    """start elasticsearch and write documents to it
-    """
-    launch_es()
-    document_store = ElasticsearchDocumentStore(host="localhost", username="", password="", index="document")
-    if docs is not None:
-        document_store.write_documents(docs)
-    return document_store
+# FLAGS([''])
 
 
 def load_and_clean_documents(doc_dir: str):
@@ -38,9 +29,11 @@ def load_and_clean_documents(doc_dir: str):
 
 
 def main(_argv):
+    # launch_es() # Do not start elasticsearch in the python script.
     FLAGS.doc_dir = os.path.expanduser(FLAGS.doc_dir)
     docs = load_and_clean_documents(doc_dir=FLAGS.doc_dir)
-    document_store = start_elasticsearch(docs=docs)
+    document_store = ElasticsearchDocumentStore(host="localhost", username="", password="", index="document")
+    document_store.write_documents(docs)
 
 if __name__ == '__main__':
     try:

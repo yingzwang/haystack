@@ -20,15 +20,20 @@ cd ui
 pip install -r requirements.txt
 ```
 
-#### Run Elasticsearch with docker container (optional)
+#### Run Elasticsearch with GOT articles (optional)
 ```bash
-docker run -dp 9200:9200 -e "discovery.type=single-node" elasticsearch:7.9.2
 docker run -dp 9200:9200 -e "discovery.type=single-node" deepset/elasticsearch-game-of-thrones
 ```
 
-#### Run Elasticsearch and load documents locally
+#### Run Elasticsearch with an empty instance
 ```bash
-python ./demo-yw/run_elasticsearch.py
+docker run -dp 9200:9200 -e "discovery.type=single-node" elasticsearch:7.9.2
+```
+
+#### Load documents to elasticsearch
+```bash
+python ./demo-yw/init_document_store.py \
+--doc_dir="./data/ziggo_wifi_en"
 ```
 
 #### Run Haystack API
