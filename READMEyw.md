@@ -32,8 +32,7 @@ docker run -dp 9200:9200 -e "discovery.type=single-node" elasticsearch:7.9.2
 
 #### Load documents to elasticsearch
 ```bash
-python ./demo-yw/init_document_store.py \
---doc_dir="./data/ziggo_wifi_en"
+python ./demo-yw/init_document_store.py --doc_dir="./data/ziggo_wifi_en"
 ```
 
 #### Run Haystack API
