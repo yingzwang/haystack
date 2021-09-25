@@ -42,7 +42,7 @@ gunicorn rest_api.application:app -b 0.0.0.0:8000 -k uvicorn.workers.UvicornWork
 
 #### Start UI
 ```bash
-streamlit run ./ui/webapp.py
+streamlit run ./ui/webapp_ziggo.py
 ```
 
 **Note**: We use following ports
