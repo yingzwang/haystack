@@ -14,7 +14,8 @@ from utils import retrieve_doc
 from utils import upload_doc
 
 # Adjust to a question that you would like users to see in the search bar when they load the UI:
-DEFAULT_QUESTION_AT_STARTUP = "Where should I put the wifi pod in the house?"
+DEFAULT_QUESTION_AT_STARTUP = "Who is the father of Arya Stark?"
+# DEFAULT_QUESTION_AT_STARTUP = "Where should I put the wifi pod in the house?"
 
 
 def annotate_answer(answer, context):
