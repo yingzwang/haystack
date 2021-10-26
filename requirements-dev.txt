@@ -6,4 +6,4 @@ webdriver-manager
 beautifulsoup4
 markdown
 matplotlib
-googletrans
+googletrans==4.0.0rc1
