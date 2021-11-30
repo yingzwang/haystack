@@ -30,9 +30,14 @@ docker run -dp 9200:9200 -e "discovery.type=single-node" deepset/elasticsearch-g
 docker run -dp 9200:9200 -e "discovery.type=single-node" elasticsearch:7.9.2
 ```
 
-#### Load documents to elasticsearch
+#### Load documents to elasticsearch (demo 1: WiFi trouble shooting)
 ```bash
 python ./demo_yw/init_document_store.py --doc_dir="./data/ziggo_wifi_en"
+```
+
+#### Load documents to elasticsearch (demo 2: financial reports)
+```bash
+python ./demo_yw/init_document_store.py --doc_dir="./data/pdf"
 ```
 
 #### Run Haystack API
