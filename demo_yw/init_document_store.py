@@ -6,7 +6,7 @@ from haystack.preprocessor import PreProcessor
 from haystack.utils import launch_es
 from absl import app, flags, logging
 from absl.flags import FLAGS
-flags.DEFINE_string('doc_dir', './data/ziggo_wifi_en', 'Directory of documents (txt files)')
+flags.DEFINE_string('doc_dir', './data/ziggo_wifi_en', 'Directory of documents (txt, pdf, docx)')
 # FLAGS([''])
 
 
