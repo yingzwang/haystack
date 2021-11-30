@@ -33,6 +33,7 @@ def main(_argv):
     FLAGS.doc_dir = os.path.expanduser(FLAGS.doc_dir)
     docs = load_and_clean_documents(doc_dir=FLAGS.doc_dir)
     document_store = ElasticsearchDocumentStore(host="localhost", username="", password="", index="document")
+    document_store.delete_documents()
     document_store.write_documents(docs)
 
 if __name__ == '__main__':
