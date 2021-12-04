@@ -2,7 +2,7 @@
 # Module base
 
 <a name="base.BaseTranslator"></a>
-## BaseTranslator Objects
+## BaseTranslator
 
 ```python
 class BaseTranslator(BaseComponent)
@@ -15,7 +15,7 @@ Abstract class for a Translator component that translates either a query or a do
 
 ```python
  | @abstractmethod
- | translate(query: Optional[str] = None, documents: Optional[Union[List[Document], List[str], List[Dict[str, Any]]]] = None, dict_key: Optional[str] = None) -> Union[str, List[Document], List[str], List[Dict[str, Any]]]
+ | translate(query: Optional[str] = None, documents: Optional[Union[List[Document], List[Answer], List[str], List[Dict[str, Any]]]] = None, dict_key: Optional[str] = None) -> Union[str, List[Document], List[Answer], List[str], List[Dict[str, Any]]]
 ```
 
 Translate the passed query or a list of documents from language A to B.
@@ -24,7 +24,7 @@ Translate the passed query or a list of documents from language A to B.
 #### run
 
 ```python
- | run(query: Optional[str] = None, documents: Optional[Union[List[Document], List[str], List[Dict[str, Any]]]] = None, answers: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None, dict_key: Optional[str] = None)
+ | run(query: Optional[str] = None, documents: Optional[Union[List[Document], List[Answer], List[str], List[Dict[str, Any]]]] = None, answers: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None, dict_key: Optional[str] = None)
 ```
 
 Method that gets executed when this class is used as a Node in a Haystack Pipeline
@@ -33,7 +33,7 @@ Method that gets executed when this class is used as a Node in a Haystack Pipeli
 # Module transformers
 
 <a name="transformers.TransformersTranslator"></a>
-## TransformersTranslator Objects
+## TransformersTranslator
 
 ```python
 class TransformersTranslator(BaseTranslator)
@@ -61,7 +61,7 @@ We currently recommend using OPUS models (see __init__() for details)
 #### \_\_init\_\_
 
 ```python
- | __init__(model_name_or_path: str, tokenizer_name: Optional[str] = None, max_seq_len: Optional[int] = None, clean_up_tokenization_spaces: Optional[bool] = True)
+ | __init__(model_name_or_path: str, tokenizer_name: Optional[str] = None, max_seq_len: Optional[int] = None, clean_up_tokenization_spaces: Optional[bool] = True, use_gpu: bool = True)
 ```
 
 Initialize the translator with a model that fits your targeted languages. While we support all seq2seq
@@ -84,12 +84,13 @@ They also have a few multilingual models that support multiple languages at once
                        tokenizer.
 - `max_seq_len`: The maximum sentence length the model accepts. (Optional)
 - `clean_up_tokenization_spaces`: Whether or not to clean up the tokenization spaces. (default True)
+- `use_gpu`: Whether to use GPU or the CPU. Falls back on CPU if no GPU is available.
 
 <a name="transformers.TransformersTranslator.translate"></a>
 #### translate
 
 ```python
- | translate(query: Optional[str] = None, documents: Optional[Union[List[Document], List[str], List[Dict[str, Any]]]] = None, dict_key: Optional[str] = None) -> Union[str, List[Document], List[str], List[Dict[str, Any]]]
+ | translate(query: Optional[str] = None, documents: Optional[Union[List[Document], List[Answer], List[str], List[Dict[str, Any]]]] = None, dict_key: Optional[str] = None) -> Union[str, List[Document], List[Answer], List[str], List[Dict[str, Any]]]
 ```
 
 Run the actual translation. You can supply a query or a list of documents. Whatever is supplied will be translated.
@@ -98,5 +99,5 @@ Run the actual translation. You can supply a query or a list of documents. Whate
 
 - `query`: The query string to translate
 - `documents`: The documents to translate
-- `dict_key`: 
+- `dict_key`: If you pass a dictionary in `documents`, you can specify here the field which shall be translated.
 

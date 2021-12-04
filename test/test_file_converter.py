@@ -1,21 +1,21 @@
 from pathlib import Path
+import os
 
 import pytest
 
-from haystack.file_converter import MarkdownConverter
-from haystack.file_converter.docx import DocxToTextConverter
-from haystack.file_converter.pdf import PDFToTextConverter, PDFToTextOCRConverter
-from haystack.file_converter.tika import TikaConverter
+from haystack.nodes import MarkdownConverter, DocxToTextConverter, PDFToTextConverter, PDFToTextOCRConverter, \
+    TikaConverter, AzureConverter
 
 
 @pytest.mark.tika
 @pytest.mark.parametrize(
-    "Converter", [PDFToTextConverter, TikaConverter, PDFToTextOCRConverter]
+    # "Converter", [PDFToTextConverter, TikaConverter, PDFToTextOCRConverter]
+    "Converter", [PDFToTextOCRConverter]
 )
-def test_convert(Converter, xpdf_fixture):
+def test_convert(Converter):
     converter = Converter()
-    document = converter.convert(file_path=Path("samples/pdf/sample_pdf_1.pdf"))
-    pages = document["text"].split("\f")
+    document = converter.convert(file_path=Path("samples/pdf/sample_pdf_1.pdf"))[0]
+    pages = document["content"].split("\f")
     assert len(pages) == 4  # the sample PDF file has four pages.
     assert pages[0] != ""  # the page 1 of PDF contains text.
     assert pages[2] == ""  # the page 3 of PDF file is empty.
@@ -30,10 +30,10 @@ def test_convert(Converter, xpdf_fixture):
 
 @pytest.mark.tika
 @pytest.mark.parametrize("Converter", [PDFToTextConverter, TikaConverter])
-def test_table_removal(Converter, xpdf_fixture):
+def test_table_removal(Converter):
     converter = Converter(remove_numeric_tables=True)
-    document = converter.convert(file_path=Path("samples/pdf/sample_pdf_1.pdf"))
-    pages = document["text"].split("\f")
+    document = converter.convert(file_path=Path("samples/pdf/sample_pdf_1.pdf"))[0]
+    pages = document["content"].split("\f")
     # assert numeric rows are removed from the table.
     assert "324" not in pages[0]
     assert "54x growth" not in pages[0]
@@ -41,7 +41,7 @@ def test_table_removal(Converter, xpdf_fixture):
 
 @pytest.mark.tika
 @pytest.mark.parametrize("Converter", [PDFToTextConverter, TikaConverter])
-def test_language_validation(Converter, xpdf_fixture, caplog):
+def test_language_validation(Converter, caplog):
     converter = Converter(valid_languages=["en"])
     converter.convert(file_path=Path("samples/pdf/sample_pdf_1.pdf"))
     assert (
@@ -59,11 +59,31 @@ def test_language_validation(Converter, xpdf_fixture, caplog):
 
 def test_docx_converter():
     converter = DocxToTextConverter()
-    document = converter.convert(file_path=Path("samples/docx/sample_docx.docx"))
-    assert document["text"].startswith("Sample Docx File")
+    document = converter.convert(file_path=Path("samples/docx/sample_docx.docx"))[0]
+    assert document["content"].startswith("Sample Docx File")
 
 
 def test_markdown_converter():
     converter = MarkdownConverter()
-    document = converter.convert(file_path=Path("samples/markdown/sample.md"))
-    assert document["text"].startswith("What to build with Haystack")
+    document = converter.convert(file_path=Path("samples/markdown/sample.md"))[0]
+    assert document["content"].startswith("What to build with Haystack")
+
+
+def test_azure_converter():
+    # Check if Form Recognizer endpoint and credential key in environment variables
+    if "AZURE_FORMRECOGNIZER_ENDPOINT" in os.environ and "AZURE_FORMRECOGNIZER_KEY" in os.environ:
+        converter = AzureConverter(endpoint=os.environ["AZURE_FORMRECOGNIZER_ENDPOINT"],
+                                   credential_key=os.environ["AZURE_FORMRECOGNIZER_KEY"],
+                                   save_json=True,
+                                   )
+
+        docs = converter.convert(file_path="samples/pdf/sample_pdf_1.pdf")
+        assert len(docs) == 2
+        assert docs[0]["content_type"] == "table"
+        assert len(docs[0]["content"]) == 5  # number of rows
+        assert len(docs[0]["content"][0]) == 5  # number of columns, Form Recognizer assumes there are 5 columns
+        assert docs[0]["content"][0] == ['', 'Column 1', '', 'Column 2', 'Column 3']
+        assert docs[0]["content"][4] == ['D', '$54.35', '', '$6345.', '']
+
+        assert docs[1]["content_type"] == "text"
+        assert docs[1]["content"].startswith("A sample PDF file")

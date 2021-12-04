@@ -1,2 +1,0 @@
-from haystack.ranker.farm import FARMRanker
-from haystack.ranker.sentence_transformers import SentenceTransformersRanker

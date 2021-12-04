@@ -9,7 +9,7 @@ from typing import Optional, List
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from pydantic import BaseModel
 
-from haystack.pipeline import Pipeline
+from haystack.pipelines.base import Pipeline
 from rest_api.config import PIPELINE_YAML_PATH, FILE_UPLOAD_PATH, INDEXING_PIPELINE_NAME
 from rest_api.controller.utils import as_form
 
@@ -21,14 +21,15 @@ try:
         path=Path(PIPELINE_YAML_PATH), pipeline_name=INDEXING_PIPELINE_NAME, overwrite_with_env_variables=True
     )
     # Since each instance of FAISSDocumentStore creates an in-memory FAISS index, the Indexing & Query Pipelines would
-    # end up with different indices. The check below prevents creation of Indexing Pipelines with FAISSDocumentStore.   
-    is_faiss_present = False
+    # end up with different indices. The same applies for InMemoryDocumentStore. The check below prevents creation of 
+    # Indexing Pipelines with FAISSDocumentStore or InMemoryDocumentStore.   
+    is_faiss_or_inmemory_present = False
     for node in pipeline_config["nodes"]:
-        if definitions[node["name"]]["type"] == "FAISSDocumentStore":
-            is_faiss_present = True
+        if definitions[node["name"]]["type"] == "FAISSDocumentStore" or definitions[node["name"]]["type"] == "InMemoryDocumentStore":
+            is_faiss_or_inmemory_present = True
             break
-    if is_faiss_present:
-        logger.warning("Indexing Pipeline with FAISSDocumentStore is not supported with the REST APIs.")
+    if is_faiss_or_inmemory_present:
+        logger.warning("Indexing Pipeline with FAISSDocumentStore or InMemoryDocumentStore is not supported with the REST APIs.")
         INDEXING_PIPELINE = None
     else:
         INDEXING_PIPELINE = Pipeline.load_from_yaml(Path(PIPELINE_YAML_PATH), pipeline_name=INDEXING_PIPELINE_NAME)
@@ -41,12 +42,16 @@ os.makedirs(FILE_UPLOAD_PATH, exist_ok=True)  # create directory for uploading f
 
 
 @as_form
-class FileUploadParams(BaseModel):
+class FileConverterParams(BaseModel):    
     remove_numeric_tables: Optional[bool] = None
-    remove_whitespace: Optional[bool] = None
-    remove_empty_lines: Optional[bool] = None
-    remove_header_footer: Optional[bool] = None
     valid_languages: Optional[List[str]] = None
+
+
+@as_form
+class PreprocessorParams(BaseModel):
+    clean_whitespace: Optional[bool] = None
+    clean_empty_lines: Optional[bool] = None
+    clean_header_footer: Optional[bool] = None
     split_by: Optional[str] = None
     split_length: Optional[int] = None
     split_overlap: Optional[int] = None
@@ -58,10 +63,11 @@ class Response(BaseModel):
 
 
 @router.post("/file-upload")
-def file_upload(
+def upload_file(
     files: List[UploadFile] = File(...),
     meta: Optional[str] = Form("null"),  # JSON serialized string
-    params: FileUploadParams = Depends(FileUploadParams.as_form)
+    fileconverter_params: FileConverterParams = Depends(FileConverterParams.as_form),
+    preprocessor_params: PreprocessorParams = Depends(PreprocessorParams.as_form)
 ):
     if not INDEXING_PIPELINE:
         raise HTTPException(status_code=501, detail="Indexing Pipeline is not configured.")
@@ -85,5 +91,9 @@ def file_upload(
     INDEXING_PIPELINE.run(
             file_paths=file_paths,
             meta=file_metas,
-            params=params.dict(),
+            params={
+                "TextFileConverter": fileconverter_params.dict(), 
+                "PDFFileConverter": fileconverter_params.dict(),
+                "Preprocessor": preprocessor_params.dict()
+            },
     )

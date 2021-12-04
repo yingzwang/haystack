@@ -1,7 +1,7 @@
-from haystack.document_store.elasticsearch import ElasticsearchDocumentStore
+from haystack.document_stores import ElasticsearchDocumentStore
 
-from haystack.retriever.dense import EmbeddingRetriever
-from haystack.utils import print_answers, launch_es
+from haystack.nodes import EmbeddingRetriever
+from haystack.utils import launch_es, print_answers
 import pandas as pd
 import requests
 import logging
@@ -60,19 +60,19 @@ def tutorial4_faq_style_qa():
     # Get embeddings for our questions from the FAQs
     questions = list(df["question"].values)
     df["question_emb"] = retriever.embed_queries(texts=questions)
-    df = df.rename(columns={"question": "text"})
+    df = df.rename(columns={"question": "content"})
 
     # Convert Dataframe to list of dicts and index them in our DocumentStore
     docs_to_index = df.to_dict(orient="records")
     document_store.write_documents(docs_to_index)
 
-    #    Initialize a Pipeline (this time without a reader) and ask questions
+    # Initialize a Pipeline (this time without a reader) and ask questions
 
-    from haystack.pipeline import FAQPipeline
+    from haystack.pipelines import FAQPipeline
     pipe = FAQPipeline(retriever=retriever)
 
     prediction = pipe.run(query="How is the virus spreading?", params={"Retriever": {"top_k": 10}})
-    print_answers(prediction, details="all")
+    print_answers(prediction, details="medium")
 
 
 if __name__ == "__main__":

@@ -24,6 +24,15 @@ components:
     type: PreProcessor
     params:
       clean_whitespace: true
+  - name: IndexTimeDocumentClassifier
+    type: TransformersDocumentClassifier
+    params:
+      batch_size: 16
+      use_gpu: -1
+  - name: QueryTimeDocumentClassifier
+    type: TransformersDocumentClassifier
+    params:
+      use_gpu: -1
 
 
 pipelines:
@@ -44,6 +53,16 @@ pipelines:
       - name: Reader
         inputs: [ ESRetriever ]
 
+  - name: query_pipeline_with_document_classifier
+    type: Pipeline
+    nodes:
+      - name: ESRetriever
+        inputs: [Query]
+      - name: QueryTimeDocumentClassifier
+        inputs: [ESRetriever]
+      - name: Reader
+        inputs: [QueryTimeDocumentClassifier]
+
   - name: indexing_pipeline
     type: Pipeline
     nodes:
@@ -53,5 +72,31 @@ pipelines:
         inputs: [PDFConverter]
       - name: ESRetriever
         inputs: [Preprocessor]
+      - name: DocumentStore
+        inputs: [ESRetriever]
+
+  - name: indexing_text_pipeline
+    type: Pipeline
+    nodes:
+      - name: TextConverter
+        inputs: [File]
+      - name: Preprocessor
+        inputs: [TextConverter]
+      - name: ESRetriever
+        inputs: [Preprocessor]
+      - name: DocumentStore
+        inputs: [ESRetriever]
+
+  - name: indexing_pipeline_with_classifier
+    type: Pipeline
+    nodes:
+      - name: PDFConverter
+        inputs: [File]
+      - name: Preprocessor
+        inputs: [PDFConverter]
+      - name: IndexTimeDocumentClassifier
+        inputs: [Preprocessor]
+      - name: ESRetriever
+        inputs: [IndexTimeDocumentClassifier]
       - name: DocumentStore
         inputs: [ESRetriever]

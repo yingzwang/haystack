@@ -21,7 +21,7 @@ def parse_requirements(filename):
     parsed_requirements = [line.strip()
                            for line in parsed_requirements
                            if not ((line.strip()[0] == "#") or line.strip().startswith('--find-links') or ("git+https" in line))]
-    
+
     return parsed_requirements
 
 
@@ -84,5 +84,5 @@ setup(
         "License :: OSI Approved :: Apache Software License",
         "Programming Language :: Python :: 3",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    ],
+    ]
 )

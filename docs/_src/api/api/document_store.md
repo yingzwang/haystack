@@ -1,8 +1,17 @@
 <a name="base"></a>
 # Module base
 
+<a name="base.BaseKnowledgeGraph"></a>
+## BaseKnowledgeGraph
+
+```python
+class BaseKnowledgeGraph(BaseComponent)
+```
+
+Base class for implementing Knowledge Graphs.
+
 <a name="base.BaseDocumentStore"></a>
-## BaseDocumentStore Objects
+## BaseDocumentStore
 
 ```python
 class BaseDocumentStore(BaseComponent)
@@ -63,7 +72,7 @@ Get documents from the document store.
 #### get\_all\_labels\_aggregated
 
 ```python
- | get_all_labels_aggregated(index: Optional[str] = None, filters: Optional[Dict[str, List[str]]] = None, open_domain: bool = True, aggregate_by_meta: Optional[Union[str, list]] = None) -> List[MultiLabel]
+ | get_all_labels_aggregated(index: Optional[str] = None, filters: Optional[Dict[str, List[str]]] = None, open_domain: bool = True, drop_negative_labels: bool = False, drop_no_answers: bool = False, aggregate_by_meta: Optional[Union[str, list]] = None) -> List[MultiLabel]
 ```
 
 Return all labels in the DocumentStore, aggregated into MultiLabel objects.
@@ -88,7 +97,18 @@ object, provided that they have the same product_id (to be found in Label.meta["
                     When False, labels are aggregated in a closed domain fashion based on the question text
                     and also the id of the document that the label is tied to. In this setting, this function
                     might return multiple MultiLabel objects with the same question string.
+:param TODO drop params
 - `aggregate_by_meta`: The names of the Label meta fields by which to aggregate. For example: ["product_id"]
+
+<a name="base.BaseDocumentStore.normalize_embedding"></a>
+#### normalize\_embedding
+
+```python
+ | @njit
+ | normalize_embedding(emb: np.ndarray) -> None
+```
+
+Performs L2 normalization of embeddings vector inplace. Input can be a single vector (1D array) or a matrix (2D array).
 
 <a name="base.BaseDocumentStore.add_eval_data"></a>
 #### add\_eval\_data
@@ -117,11 +137,20 @@ from disk and also indexed batchwise to the DocumentStore in order to prevent ou
 - `open_domain`: Set this to True if your file is an open domain dataset where two different answers to the
                     same question might be found in different contexts.
 
+<a name="base.get_batches_from_generator"></a>
+#### get\_batches\_from\_generator
+
+```python
+get_batches_from_generator(iterable, n)
+```
+
+Batch elements of an iterable into fixed-length chunks or blocks.
+
 <a name="elasticsearch"></a>
 # Module elasticsearch
 
 <a name="elasticsearch.ElasticsearchDocumentStore"></a>
-## ElasticsearchDocumentStore Objects
+## ElasticsearchDocumentStore
 
 ```python
 class ElasticsearchDocumentStore(BaseDocumentStore)
@@ -131,7 +160,7 @@ class ElasticsearchDocumentStore(BaseDocumentStore)
 #### \_\_init\_\_
 
 ```python
- | __init__(host: Union[str, List[str]] = "localhost", port: Union[int, List[int]] = 9200, username: str = "", password: str = "", api_key_id: Optional[str] = None, api_key: Optional[str] = None, aws4auth=None, index: str = "document", label_index: str = "label", search_fields: Union[str, list] = "text", text_field: str = "text", name_field: str = "name", embedding_field: str = "embedding", embedding_dim: int = 768, custom_mapping: Optional[dict] = None, excluded_meta_data: Optional[list] = None, faq_question_field: Optional[str] = None, analyzer: str = "standard", scheme: str = "http", ca_certs: Optional[str] = None, verify_certs: bool = True, create_index: bool = True, refresh_type: str = "wait_for", similarity="dot_product", timeout=30, return_embedding: bool = False, duplicate_documents: str = 'overwrite', index_type: str = "flat")
+ | __init__(host: Union[str, List[str]] = "localhost", port: Union[int, List[int]] = 9200, username: str = "", password: str = "", api_key_id: Optional[str] = None, api_key: Optional[str] = None, aws4auth=None, index: str = "document", label_index: str = "label", search_fields: Union[str, list] = "content", content_field: str = "content", name_field: str = "name", embedding_field: str = "embedding", embedding_dim: int = 768, custom_mapping: Optional[dict] = None, excluded_meta_data: Optional[list] = None, analyzer: str = "standard", scheme: str = "http", ca_certs: Optional[str] = None, verify_certs: bool = True, create_index: bool = True, refresh_type: str = "wait_for", similarity="dot_product", timeout=30, return_embedding: bool = False, duplicate_documents: str = 'overwrite', index_type: str = "flat", scroll: str = "1d", skip_missing_embeddings: bool = True, synonyms: Optional[List] = None, synonym_type: str = "synonym")
 ```
 
 A DocumentStore using Elasticsearch to store and query the documents for our search.
@@ -152,7 +181,7 @@ A DocumentStore using Elasticsearch to store and query the documents for our sea
 - `index`: Name of index in elasticsearch to use for storing the documents that we want to search. If not existing yet, we will create one.
 - `label_index`: Name of index in elasticsearch to use for storing labels. If not existing yet, we will create one.
 - `search_fields`: Name of fields used by ElasticsearchRetriever to find matches in the docs to our incoming query (using elastic's multi_match query), e.g. ["title", "full_text"]
-- `text_field`: Name of field that might contain the answer and will therefore be passed to the Reader Model (e.g. "full_text").
+- `content_field`: Name of field that might contain the answer and will therefore be passed to the Reader Model (e.g. "full_text").
                    If no Reader is used (e.g. in FAQ-Style QA) the plain content of this field will just be returned.
 - `name_field`: Name of field that contains the title of the the doc
 - `embedding_field`: Name of field containing an embedding vector (Only needed when using a dense retriever (e.g. DensePassageRetriever, EmbeddingRetriever) on top)
@@ -171,7 +200,7 @@ A DocumentStore using Elasticsearch to store and query the documents for our sea
                      If set to 'wait_for', continue only after changes are visible (slow, but safe).
                      If set to 'false', continue directly (fast, but sometimes unintuitive behaviour when docs are not immediately available after ingestion).
                      More info at https://www.elastic.co/guide/en/elasticsearch/reference/6.8/docs-refresh.html
-- `similarity`: The similarity function used to compare document vectors. 'dot_product' is the default sine it is
+- `similarity`: The similarity function used to compare document vectors. 'dot_product' is the default since it is
                    more performant with DPR embeddings. 'cosine' is recommended if you are using a Sentence BERT model.
 - `timeout`: Number of seconds after which an ElasticSearch request times out.
 - `return_embedding`: To return document embedding
@@ -183,6 +212,20 @@ A DocumentStore using Elasticsearch to store and query the documents for our sea
                             exists.
 - `index_type`: The type of index to be created. Choose from 'flat' and 'hnsw'. Currently the
                    ElasticsearchDocumentStore does not support HNSW but OpenDistroElasticsearchDocumentStore does.
+- `scroll`: Determines how long the current index is fixed, e.g. during updating all documents with embeddings.
+               Defaults to "1d" and should not be larger than this. Can also be in minutes "5m" or hours "15h"
+               For details, see https://www.elastic.co/guide/en/elasticsearch/reference/current/scroll-api.html
+- `skip_missing_embeddings`: Parameter to control queries based on vector similarity when indexed documents miss embeddings.
+                                Parameter options: (True, False)
+                                False: Raises exception if one or more documents do not have embeddings at query time
+                                True: Query will ignore all documents without embeddings (recommended if you concurrently index and query)
+- `synonyms`: List of synonyms can be passed while elasticsearch initialization.
+                 For example: [ "foo, bar => baz",
+                                "foozball , foosball" ]
+                 More info at https://www.elastic.co/guide/en/elasticsearch/reference/current/analysis-synonym-tokenfilter.html
+- `synonym_type`: Synonym filter type can be passed.
+                     Synonym or Synonym_graph to handle synonyms, including multi-word synonyms correctly during the analysis process.
+                     More info at https://www.elastic.co/guide/en/elasticsearch/reference/current/analysis-synonym-graph-tokenfilter.html
 
 <a name="elasticsearch.ElasticsearchDocumentStore.get_document_by_id"></a>
 #### get\_document\_by\_id
@@ -239,12 +282,12 @@ they will automatically get UUIDs assigned. See the `Document` class for details
 **Arguments**:
 
 - `documents`: a list of Python dictionaries or a list of Haystack Document objects.
-                  For documents as dictionaries, the format is {"text": "<the-actual-text>"}.
-                  Optionally: Include meta data via {"text": "<the-actual-text>",
+                  For documents as dictionaries, the format is {"content": "<the-actual-text>"}.
+                  Optionally: Include meta data via {"content": "<the-actual-text>",
                   "meta":{"name": "<some-document-name>, "author": "somebody", ...}}
                   It can be used for filtering and is accessible in the responses of the Finder.
                   Advanced: If you are using your own Elasticsearch mapping, the key names in the dictionary
-                  should be changed to what you have set for self.text_field and self.name_field.
+                  should be changed to what you have set for self.content_field and self.name_field.
 - `index`: Elasticsearch index where the documents should be indexed. If not supplied, self.index will be used.
 - `batch_size`: Number of documents that are passed to Elasticsearch's bulk function at a time.
 - `duplicate_documents`: Handle duplicates document based on parameter options.
@@ -274,6 +317,7 @@ Write annotation labels into document store.
 **Arguments**:
 
 - `labels`: A list of Python dictionaries or a list of Haystack Label objects.
+- `index`: Elasticsearch index where the labels should be stored. If not supplied, self.label_index will be used.
 - `batch_size`: Number of labels that are passed to Elasticsearch's bulk function at a time.
 
 <a name="elasticsearch.ElasticsearchDocumentStore.update_document_meta"></a>
@@ -455,22 +499,49 @@ None
 #### delete\_documents
 
 ```python
- | delete_documents(index: Optional[str] = None, filters: Optional[Dict[str, List[str]]] = None)
+ | delete_documents(index: Optional[str] = None, ids: Optional[List[str]] = None, filters: Optional[Dict[str, List[str]]] = None)
 ```
 
 Delete documents in an index. All documents are deleted if no filters are passed.
 
 **Arguments**:
 
-- `index`: Index name to delete the document from.
+- `index`: Index name to delete the documents from. If None, the
+              DocumentStore's default index (self.index) will be used
+- `ids`: Optional list of IDs to narrow down the documents to be deleted.
 - `filters`: Optional filters to narrow down the documents to be deleted.
+    Example filters: {"name": ["some", "more"], "category": ["only_one"]}.
+    If filters are provided along with a list of IDs, this method deletes the
+    intersection of the two query results (documents that match the filters and
+    have their ID in the list).
+
+**Returns**:
+
+None
+
+<a name="elasticsearch.ElasticsearchDocumentStore.delete_labels"></a>
+#### delete\_labels
+
+```python
+ | delete_labels(index: Optional[str] = None, ids: Optional[List[str]] = None, filters: Optional[Dict[str, List[str]]] = None)
+```
+
+Delete labels in an index. All labels are deleted if no filters are passed.
+
+**Arguments**:
+
+- `index`: Index name to delete the labels from. If None, the
+              DocumentStore's default label index (self.label_index) will be used
+- `ids`: Optional list of IDs to narrow down the labels to be deleted.
+- `filters`: Optional filters to narrow down the labels to be deleted.
+    Example filters: {"id": ["9a196e41-f7b5-45b4-bd19-5feb7501c159", "9a196e41-f7b5-45b4-bd19-5feb7501c159"]} or {"query": ["question2"]}
 
 **Returns**:
 
 None
 
 <a name="elasticsearch.OpenSearchDocumentStore"></a>
-## OpenSearchDocumentStore Objects
+## OpenSearchDocumentStore
 
 ```python
 class OpenSearchDocumentStore(ElasticsearchDocumentStore)
@@ -504,7 +575,7 @@ Find the document that is most similar to the provided `query_emb` by using a ve
 
 
 <a name="elasticsearch.OpenDistroElasticsearchDocumentStore"></a>
-## OpenDistroElasticsearchDocumentStore Objects
+## OpenDistroElasticsearchDocumentStore
 
 ```python
 class OpenDistroElasticsearchDocumentStore(OpenSearchDocumentStore)
@@ -516,7 +587,7 @@ A DocumentStore which has an Open Distro for Elasticsearch service behind it.
 # Module memory
 
 <a name="memory.InMemoryDocumentStore"></a>
-## InMemoryDocumentStore Objects
+## InMemoryDocumentStore
 
 ```python
 class InMemoryDocumentStore(BaseDocumentStore)
@@ -600,7 +671,7 @@ Write annotation labels into document store.
  | get_document_by_id(id: str, index: Optional[str] = None) -> Optional[Document]
 ```
 
-Fetch a document by specifying its text id string
+Fetch a document by specifying its text id string.
 
 <a name="memory.InMemoryDocumentStore.get_documents_by_id"></a>
 #### get\_documents\_by\_id
@@ -609,7 +680,7 @@ Fetch a document by specifying its text id string
  | get_documents_by_id(ids: List[str], index: Optional[str] = None) -> List[Document]
 ```
 
-Fetch documents by specifying a list of text id strings
+Fetch documents by specifying a list of text id strings.
 
 <a name="memory.InMemoryDocumentStore.query_by_embedding"></a>
 #### query\_by\_embedding
@@ -637,7 +708,7 @@ Find the document that is most similar to the provided `query_emb` by using a ve
 #### update\_embeddings
 
 ```python
- | update_embeddings(retriever: BaseRetriever, index: Optional[str] = None, filters: Optional[Dict[str, List[str]]] = None, update_existing_embeddings: bool = True, batch_size: int = 10_000)
+ | update_embeddings(retriever: 'BaseRetriever', index: Optional[str] = None, filters: Optional[Dict[str, List[str]]] = None, update_existing_embeddings: bool = True, batch_size: int = 10_000)
 ```
 
 Updates the embeddings in the the document store using the encoding model specified in the retriever.
@@ -684,7 +755,24 @@ Return the count of embeddings in the document store.
  | get_label_count(index: Optional[str] = None) -> int
 ```
 
-Return the number of labels in the document store
+Return the number of labels in the document store.
+
+<a name="memory.InMemoryDocumentStore.get_all_documents"></a>
+#### get\_all\_documents
+
+```python
+ | get_all_documents(index: Optional[str] = None, filters: Optional[Dict[str, List[str]]] = None, return_embedding: Optional[bool] = None, batch_size: int = 10_000) -> List[Document]
+```
+
+Get all documents from the document store as a list.
+
+**Arguments**:
+
+- `index`: Name of the index to get the documents from. If None, the
+              DocumentStore's default index (self.index) will be used.
+- `filters`: Optional filters to narrow down the documents to return.
+                Example: {"name": ["some", "more"], "category": ["only_one"]}
+- `return_embedding`: Whether to return the document embeddings.
 
 <a name="memory.InMemoryDocumentStore.get_all_documents_generator"></a>
 #### get\_all\_documents\_generator
@@ -711,7 +799,7 @@ documents.
  | get_all_labels(index: str = None, filters: Optional[Dict[str, List[str]]] = None) -> List[Label]
 ```
 
-Return all labels in the document store
+Return all labels in the document store.
 
 <a name="memory.InMemoryDocumentStore.delete_all_documents"></a>
 #### delete\_all\_documents
@@ -735,15 +823,42 @@ None
 #### delete\_documents
 
 ```python
- | delete_documents(index: Optional[str] = None, filters: Optional[Dict[str, List[str]]] = None)
+ | delete_documents(index: Optional[str] = None, ids: Optional[List[str]] = None, filters: Optional[Dict[str, List[str]]] = None)
 ```
 
 Delete documents in an index. All documents are deleted if no filters are passed.
 
 **Arguments**:
 
-- `index`: Index name to delete the document from.
+- `index`: Index name to delete the documents from. If None, the
+              DocumentStore's default index (self.index) will be used.
+- `ids`: Optional list of IDs to narrow down the documents to be deleted.
 - `filters`: Optional filters to narrow down the documents to be deleted.
+    Example filters: {"name": ["some", "more"], "category": ["only_one"]}.
+    If filters are provided along with a list of IDs, this method deletes the
+    intersection of the two query results (documents that match the filters and
+    have their ID in the list).
+
+**Returns**:
+
+None
+
+<a name="memory.InMemoryDocumentStore.delete_labels"></a>
+#### delete\_labels
+
+```python
+ | delete_labels(index: Optional[str] = None, ids: Optional[List[str]] = None, filters: Optional[Dict[str, List[str]]] = None)
+```
+
+Delete labels in an index. All labels are deleted if no filters are passed.
+
+**Arguments**:
+
+- `index`: Index name to delete the labels from. If None, the
+              DocumentStore's default label index (self.label_index) will be used.
+- `ids`: Optional list of IDs to narrow down the labels to be deleted.
+- `filters`: Optional filters to narrow down the labels to be deleted.
+                Example filters: {"id": ["9a196e41-f7b5-45b4-bd19-5feb7501c159", "9a196e41-f7b5-45b4-bd19-5feb7501c159"]} or {"query": ["question2"]}
 
 **Returns**:
 
@@ -753,7 +868,7 @@ None
 # Module sql
 
 <a name="sql.SQLDocumentStore"></a>
-## SQLDocumentStore Objects
+## SQLDocumentStore
 
 ```python
 class SQLDocumentStore(BaseDocumentStore)
@@ -763,7 +878,7 @@ class SQLDocumentStore(BaseDocumentStore)
 #### \_\_init\_\_
 
 ```python
- | __init__(url: str = "sqlite://", index: str = "document", label_index: str = "label", duplicate_documents: str = "overwrite")
+ | __init__(url: str = "sqlite://", index: str = "document", label_index: str = "label", duplicate_documents: str = "overwrite", check_same_thread: bool = False)
 ```
 
 An SQL backed DocumentStore. Currently supports SQLite, PostgreSQL and MySQL backends.
@@ -780,6 +895,7 @@ An SQL backed DocumentStore. Currently supports SQLite, PostgreSQL and MySQL bac
                             overwrite: Update any existing documents with the same ID when adding documents.
                             fail: an error is raised if the document ID of the document being added already
                             exists.
+- `check_same_thread`: Set to False to mitigate multithreading issues in older SQLite versions (see https://docs.sqlalchemy.org/en/14/dialects/sqlite.html?highlight=check_same_thread#threading-pooling-behavior)
 
 <a name="sql.SQLDocumentStore.get_document_by_id"></a>
 #### get\_document\_by\_id
@@ -841,7 +957,7 @@ Return all labels in the document store
 #### write\_documents
 
 ```python
- | write_documents(documents: Union[List[dict], List[Document]], index: Optional[str] = None, batch_size: int = 10_000, duplicate_documents: Optional[str] = None)
+ | write_documents(documents: Union[List[dict], List[Document]], index: Optional[str] = None, batch_size: int = 10_000, duplicate_documents: Optional[str] = None) -> None
 ```
 
 Indexes documents for later queries.
@@ -949,15 +1065,42 @@ None
 #### delete\_documents
 
 ```python
- | delete_documents(index: Optional[str] = None, filters: Optional[Dict[str, List[str]]] = None)
+ | delete_documents(index: Optional[str] = None, ids: Optional[List[str]] = None, filters: Optional[Dict[str, List[str]]] = None)
 ```
 
 Delete documents in an index. All documents are deleted if no filters are passed.
 
 **Arguments**:
 
-- `index`: Index name to delete the document from.
+- `index`: Index name to delete the document from. If None, the
+              DocumentStore's default index (self.index) will be used.
+- `ids`: Optional list of IDs to narrow down the documents to be deleted.
 - `filters`: Optional filters to narrow down the documents to be deleted.
+    Example filters: {"name": ["some", "more"], "category": ["only_one"]}.
+    If filters are provided along with a list of IDs, this method deletes the
+    intersection of the two query results (documents that match the filters and
+    have their ID in the list).
+
+**Returns**:
+
+None
+
+<a name="sql.SQLDocumentStore.delete_labels"></a>
+#### delete\_labels
+
+```python
+ | delete_labels(index: Optional[str] = None, ids: Optional[List[str]] = None, filters: Optional[Dict[str, List[str]]] = None)
+```
+
+Delete labels from the document store. All labels are deleted if no filters are passed.
+
+**Arguments**:
+
+- `index`: Index name to delete the labels from. If None, the
+              DocumentStore's default label index (self.label_index) will be used.
+- `ids`: Optional list of IDs to narrow down the labels to be deleted.
+- `filters`: Optional filters to narrow down the labels to be deleted.
+                Example filters: {"id": ["9a196e41-f7b5-45b4-bd19-5feb7501c159", "9a196e41-f7b5-45b4-bd19-5feb7501c159"]} or {"query": ["question2"]}
 
 **Returns**:
 
@@ -967,7 +1110,7 @@ None
 # Module faiss
 
 <a name="faiss.FAISSDocumentStore"></a>
-## FAISSDocumentStore Objects
+## FAISSDocumentStore
 
 ```python
 class FAISSDocumentStore(SQLDocumentStore)
@@ -985,7 +1128,7 @@ the vector embeddings are indexed in a FAISS Index.
 #### \_\_init\_\_
 
 ```python
- | __init__(sql_url: str = "sqlite:///faiss_document_store.db", vector_dim: int = 768, faiss_index_factory_str: str = "Flat", faiss_index: Optional["faiss.swigfaiss.Index"] = None, return_embedding: bool = False, index: str = "document", similarity: str = "dot_product", embedding_field: str = "embedding", progress_bar: bool = True, duplicate_documents: str = 'overwrite', **kwargs, ,)
+ | __init__(sql_url: str = "sqlite:///faiss_document_store.db", vector_dim: int = 768, faiss_index_factory_str: str = "Flat", faiss_index: Optional["faiss.swigfaiss.Index"] = None, return_embedding: bool = False, index: str = "document", similarity: str = "dot_product", embedding_field: str = "embedding", progress_bar: bool = True, duplicate_documents: str = 'overwrite', faiss_index_path: Union[str, Path] = None, faiss_config_path: Union[str, Path] = None, **kwargs, ,)
 ```
 
 **Arguments**:
@@ -1026,12 +1169,16 @@ the vector embeddings are indexed in a FAISS Index.
                             overwrite: Update any existing documents with the same ID when adding documents.
                             fail: an error is raised if the document ID of the document being added already
                             exists.
+- `faiss_index_path`: Stored FAISS index file. Can be created via calling `save()`.
+    If specified no other params besides faiss_config_path must be specified.
+- `faiss_config_path`: Stored FAISS initial configuration parameters.
+    Can be created via calling `save()`
 
 <a name="faiss.FAISSDocumentStore.write_documents"></a>
 #### write\_documents
 
 ```python
- | write_documents(documents: Union[List[dict], List[Document]], index: Optional[str] = None, batch_size: int = 10_000, duplicate_documents: Optional[str] = None)
+ | write_documents(documents: Union[List[dict], List[Document]], index: Optional[str] = None, batch_size: int = 10_000, duplicate_documents: Optional[str] = None) -> None
 ```
 
 Add new documents to the DocumentStore.
@@ -1055,13 +1202,13 @@ Add new documents to the DocumentStore.
 
 **Returns**:
 
-
+None
 
 <a name="faiss.FAISSDocumentStore.update_embeddings"></a>
 #### update\_embeddings
 
 ```python
- | update_embeddings(retriever: BaseRetriever, index: Optional[str] = None, update_existing_embeddings: bool = True, filters: Optional[Dict[str, List[str]]] = None, batch_size: int = 10_000)
+ | update_embeddings(retriever: 'BaseRetriever', index: Optional[str] = None, update_existing_embeddings: bool = True, filters: Optional[Dict[str, List[str]]] = None, batch_size: int = 10_000)
 ```
 
 Updates the embeddings in the the document store using the encoding model specified in the retriever.
@@ -1146,10 +1293,25 @@ Delete all documents from the document store.
 #### delete\_documents
 
 ```python
- | delete_documents(index: Optional[str] = None, filters: Optional[Dict[str, List[str]]] = None)
+ | delete_documents(index: Optional[str] = None, ids: Optional[List[str]] = None, filters: Optional[Dict[str, List[str]]] = None)
 ```
 
-Delete all documents from the document store.
+Delete documents from the document store. All documents are deleted if no filters are passed.
+
+**Arguments**:
+
+- `index`: Index name to delete the documents from. If None, the
+              DocumentStore's default index (self.index) will be used.
+- `ids`: Optional list of IDs to narrow down the documents to be deleted.
+- `filters`: Optional filters to narrow down the documents to be deleted.
+    Example filters: {"name": ["some", "more"], "category": ["only_one"]}.
+    If filters are provided along with a list of IDs, this method deletes the
+    intersection of the two query results (documents that match the filters and
+    have their ID in the list).
+
+**Returns**:
+
+None
 
 <a name="faiss.FAISSDocumentStore.query_by_embedding"></a>
 #### query\_by\_embedding
@@ -1212,21 +1374,12 @@ Note: In order to have a correct mapping from FAISS to SQL,
 - `index_path`: Stored FAISS index file. Can be created via calling `save()`
 - `config_path`: Stored FAISS initial configuration parameters.
     Can be created via calling `save()`
-- `sql_url`: Connection string to the SQL database that contains your docs and metadata.
-    Overrides the value defined in the `faiss_init_params_path` file, if present
-- `index`: Index name to load the FAISS index as. It must match the index name used for
-              when creating the FAISS index. Overrides the value defined in the 
-              `faiss_init_params_path` file, if present
-
-**Returns**:
-
-the DocumentStore
 
 <a name="milvus"></a>
 # Module milvus
 
 <a name="milvus.MilvusDocumentStore"></a>
-## MilvusDocumentStore Objects
+## MilvusDocumentStore
 
 ```python
 class MilvusDocumentStore(SQLDocumentStore)
@@ -1272,9 +1425,7 @@ As a rule of thumb, we would see a 30% ~ 50% increase in the search performance 
 Note that an overly large index_file_size value may cause failure to load a segment into the memory or graphics memory.
 (From https://milvus.io/docs/v1.0.0/performance_faq.md#How-can-I-get-the-best-performance-from-Milvus-through-setting-index_file_size)
 - `similarity`: The similarity function used to compare document vectors. 'dot_product' is the default and recommended for DPR embeddings.
-                   'cosine' is recommended for Sentence Transformers, but is not directly supported by Milvus.
-                   However, you can normalize your embeddings and use `dot_product` to get the same results.
-                   See https://milvus.io/docs/v1.0.0/metric.md?Inner-product-(IP)`floating`.
+                   'cosine' is recommended for Sentence Transformers.
 - `index_type`: Type of approximate nearest neighbour (ANN) index used. The choice here determines your tradeoff between speed and accuracy.
                    Some popular options:
                    - FLAT (default): Exact method, slow
@@ -1327,13 +1478,13 @@ Add new documents to the DocumentStore.
 
 **Returns**:
 
-
+None
 
 <a name="milvus.MilvusDocumentStore.update_embeddings"></a>
 #### update\_embeddings
 
 ```python
- | update_embeddings(retriever: BaseRetriever, index: Optional[str] = None, batch_size: int = 10_000, update_existing_embeddings: bool = True, filters: Optional[Dict[str, List[str]]] = None)
+ | update_embeddings(retriever: 'BaseRetriever', index: Optional[str] = None, batch_size: int = 10_000, update_existing_embeddings: bool = True, filters: Optional[Dict[str, List[str]]] = None)
 ```
 
 Updates the embeddings in the the document store using the encoding model specified in the retriever.
@@ -1375,7 +1526,7 @@ Find the document that is most similar to the provided `query_emb` by using a ve
 
 **Returns**:
 
-
+list of Documents that are the most similar to `query_emb`
 
 <a name="milvus.MilvusDocumentStore.delete_all_documents"></a>
 #### delete\_all\_documents
@@ -1400,16 +1551,21 @@ None
 #### delete\_documents
 
 ```python
- | delete_documents(index: Optional[str] = None, filters: Optional[Dict[str, List[str]]] = None)
+ | delete_documents(index: Optional[str] = None, ids: Optional[List[str]] = None, filters: Optional[Dict[str, List[str]]] = None)
 ```
 
-Delete all documents (from SQL AND Milvus).
+Delete documents in an index. All documents are deleted if no filters are passed.
 
 **Arguments**:
 
-- `index`: (SQL) index name for storing the docs and metadata
-- `filters`: Optional filters to narrow down the search space.
-                Example: {"name": ["some", "more"], "category": ["only_one"]}
+- `index`: Index name to delete the document from. If None, the
+              DocumentStore's default index (self.index) will be used.
+- `ids`: Optional list of IDs to narrow down the documents to be deleted.
+- `filters`: Optional filters to narrow down the documents to be deleted.
+    Example filters: {"name": ["some", "more"], "category": ["only_one"]}.
+    If filters are provided along with a list of IDs, this method deletes the
+    intersection of the two query results (documents that match the filters and
+    have their ID in the list).
 
 **Returns**:
 
@@ -1515,7 +1671,7 @@ Return the count of embeddings in the document store.
 # Module weaviate
 
 <a name="weaviate.WeaviateDocumentStore"></a>
-## WeaviateDocumentStore Objects
+## WeaviateDocumentStore
 
 ```python
 class WeaviateDocumentStore(BaseDocumentStore)
@@ -1527,7 +1683,8 @@ Weaviate is a cloud-native, modular, real-time vector search engine built to sca
 Some of the key differences in contrast to FAISS & Milvus:
 1. Stores everything in one place: documents, meta data and vectors - so less network overhead when scaling this up
 2. Allows combination of vector search and scalar filtering, i.e. you can filter for a certain tag and do dense retrieval on that subset 
-3. Has less variety of ANN algorithms, as of now only HNSW.  
+3. Has less variety of ANN algorithms, as of now only HNSW.
+4. Requires document ids to be in uuid-format. If wrongly formatted ids are provided at indexing time they will be replaced with uuids automatically.
 
 Weaviate python client is used to connect to the server, more details are here
 https://weaviate-python-client.readthedocs.io/en/docs/weaviate.html
@@ -1536,11 +1693,14 @@ Usage:
 1. Start a Weaviate server (see https://www.semi.technology/developers/weaviate/current/getting-started/installation.html)
 2. Init a WeaviateDocumentStore in Haystack
 
+Limitations:
+The current implementation is not supporting the storage of labels, so you cannot run any evaluation workflows.
+
 <a name="weaviate.WeaviateDocumentStore.__init__"></a>
 #### \_\_init\_\_
 
 ```python
- | __init__(host: Union[str, List[str]] = "http://localhost", port: Union[int, List[int]] = 8080, timeout_config: tuple = (5, 15), username: str = None, password: str = None, index: str = "Document", embedding_dim: int = 768, text_field: str = "text", name_field: str = "name", faq_question_field="question", similarity: str = "dot_product", index_type: str = "hnsw", custom_schema: Optional[dict] = None, return_embedding: bool = False, embedding_field: str = "embedding", progress_bar: bool = True, duplicate_documents: str = 'overwrite', **kwargs, ,)
+ | __init__(host: Union[str, List[str]] = "http://localhost", port: Union[int, List[int]] = 8080, timeout_config: tuple = (5, 15), username: str = None, password: str = None, index: str = "Document", embedding_dim: int = 768, content_field: str = "content", name_field: str = "name", similarity: str = "dot_product", index_type: str = "hnsw", custom_schema: Optional[dict] = None, return_embedding: bool = False, embedding_field: str = "embedding", progress_bar: bool = True, duplicate_documents: str = 'overwrite', **kwargs, ,)
 ```
 
 **Arguments**:
@@ -1553,11 +1713,11 @@ Usage:
 - `password`: password (standard authentication via http_auth)
 - `index`: Index name for document text, embedding and metadata (in Weaviate terminology, this is a "Class" in Weaviate schema).
 - `embedding_dim`: The embedding vector size. Default: 768.
-- `text_field`: Name of field that might contain the answer and will therefore be passed to the Reader Model (e.g. "full_text").
+- `content_field`: Name of field that might contain the answer and will therefore be passed to the Reader Model (e.g. "full_text").
                    If no Reader is used (e.g. in FAQ-Style QA) the plain content of this field will just be returned.
 - `name_field`: Name of field that contains the title of the the doc
-- `faq_question_field`: Name of field containing the question in case of FAQ-Style QA
 - `similarity`: The similarity function used to compare document vectors. 'dot_product' is the default.
+                   'cosine' is recommended for Sentence Transformers.
 - `index_type`: Index type of any vector object defined in weaviate schema. The vector index type is pluggable.
                    Currently, HSNW is only supported.
                    See: https://www.semi.technology/developers/weaviate/current/more-resources/performance.html
@@ -1582,7 +1742,7 @@ Usage:
  | get_document_by_id(id: str, index: Optional[str] = None) -> Optional[Document]
 ```
 
-Fetch a document by specifying its text id string
+Fetch a document by specifying its uuid string
 
 <a name="weaviate.WeaviateDocumentStore.get_documents_by_id"></a>
 #### get\_documents\_by\_id
@@ -1591,7 +1751,7 @@ Fetch a document by specifying its text id string
  | get_documents_by_id(ids: List[str], index: Optional[str] = None, batch_size: int = 10_000) -> List[Document]
 ```
 
-Fetch documents by specifying a list of text id strings
+Fetch documents by specifying a list of uuid strings.
 
 <a name="weaviate.WeaviateDocumentStore.write_documents"></a>
 #### write\_documents
@@ -1604,8 +1764,7 @@ Add new documents to the DocumentStore.
 
 **Arguments**:
 
-- `documents`: List of `Dicts` or List of `Documents`. Passing an Embedding/Vector is mandatory in case weaviate is not
-                configured with a module. If a module is configured, the embedding is automatically generated by Weaviate.
+- `documents`: List of `Dicts` or List of `Documents`. A dummy embedding vector for each document is automatically generated if it is not provided. The document id needs to be in uuid format. Otherwise a correctly formatted uuid will be automatically generated based on the provided id.
 - `index`: index name for storing the docs and metadata
 - `batch_size`: When working with large number of documents, batching can help reduce memory footprint.
 - `duplicate_documents`: Handle duplicates document based on parameter options.
@@ -1630,7 +1789,16 @@ None
  | update_document_meta(id: str, meta: Dict[str, str])
 ```
 
-Update the metadata dictionary of a document by specifying its string id
+Update the metadata dictionary of a document by specifying its string id.
+
+<a name="weaviate.WeaviateDocumentStore.get_embedding_count"></a>
+#### get\_embedding\_count
+
+```python
+ | get_embedding_count(filters: Optional[Dict[str, List[str]]] = None, index: Optional[str] = None) -> int
+```
+
+Return the number of embeddings in the document store, which is the same as the number of documents since every document has a default embedding
 
 <a name="weaviate.WeaviateDocumentStore.get_document_count"></a>
 #### get\_document\_count
@@ -1766,17 +1934,176 @@ None
 #### delete\_documents
 
 ```python
- | delete_documents(index: Optional[str] = None, filters: Optional[Dict[str, List[str]]] = None)
+ | delete_documents(index: Optional[str] = None, ids: Optional[List[str]] = None, filters: Optional[Dict[str, List[str]]] = None)
 ```
 
 Delete documents in an index. All documents are deleted if no filters are passed.
 
 **Arguments**:
 
-- `index`: Index name to delete the document from.
+- `index`: Index name to delete the document from. If None, the
+              DocumentStore's default index (self.index) will be used.
+- `ids`: Optional list of IDs to narrow down the documents to be deleted.
 - `filters`: Optional filters to narrow down the documents to be deleted.
+    Example filters: {"name": ["some", "more"], "category": ["only_one"]}.
+    If filters are provided along with a list of IDs, this method deletes the
+    intersection of the two query results (documents that match the filters and
+    have their ID in the list).
 
 **Returns**:
 
 None
+
+<a name="graphdb"></a>
+# Module graphdb
+
+<a name="graphdb.GraphDBKnowledgeGraph"></a>
+## GraphDBKnowledgeGraph
+
+```python
+class GraphDBKnowledgeGraph(BaseKnowledgeGraph)
+```
+
+Knowledge graph store that runs on a GraphDB instance.
+
+<a name="graphdb.GraphDBKnowledgeGraph.__init__"></a>
+#### \_\_init\_\_
+
+```python
+ | __init__(host: str = "localhost", port: int = 7200, username: str = "", password: str = "", index: Optional[str] = None, prefixes: str = "")
+```
+
+Init the knowledge graph by defining the settings to connect with a GraphDB instance
+
+**Arguments**:
+
+- `host`: address of server where the GraphDB instance is running
+- `port`: port where the GraphDB instance is running
+- `username`: username to login to the GraphDB instance (if any)
+- `password`: password to login to the GraphDB instance (if any)
+- `index`: name of the index (also called repository) stored in the GraphDB instance
+- `prefixes`: definitions of namespaces with a new line after each namespace, e.g., PREFIX hp: <https://deepset.ai/harry_potter/>
+
+<a name="graphdb.GraphDBKnowledgeGraph.create_index"></a>
+#### create\_index
+
+```python
+ | create_index(config_path: Path)
+```
+
+Create a new index (also called repository) stored in the GraphDB instance
+
+**Arguments**:
+
+- `config_path`: path to a .ttl file with configuration settings, details:
+https://graphdb.ontotext.com/documentation/free/configuring-a-repository.html#configure-a-repository-programmatically
+
+<a name="graphdb.GraphDBKnowledgeGraph.delete_index"></a>
+#### delete\_index
+
+```python
+ | delete_index()
+```
+
+Delete the index that GraphDBKnowledgeGraph is connected to. This method deletes all data stored in the index.
+
+<a name="graphdb.GraphDBKnowledgeGraph.import_from_ttl_file"></a>
+#### import\_from\_ttl\_file
+
+```python
+ | import_from_ttl_file(index: str, path: Path)
+```
+
+Load an existing knowledge graph represented in the form of triples of subject, predicate, and object from a .ttl file into an index of GraphDB
+
+**Arguments**:
+
+- `index`: name of the index (also called repository) in the GraphDB instance where the imported triples shall be stored
+- `path`: path to a .ttl containing a knowledge graph
+
+<a name="graphdb.GraphDBKnowledgeGraph.get_all_triples"></a>
+#### get\_all\_triples
+
+```python
+ | get_all_triples(index: Optional[str] = None)
+```
+
+Query the given index in the GraphDB instance for all its stored triples. Duplicates are not filtered.
+
+**Arguments**:
+
+- `index`: name of the index (also called repository) in the GraphDB instance
+
+**Returns**:
+
+all triples stored in the index
+
+<a name="graphdb.GraphDBKnowledgeGraph.get_all_subjects"></a>
+#### get\_all\_subjects
+
+```python
+ | get_all_subjects(index: Optional[str] = None)
+```
+
+Query the given index in the GraphDB instance for all its stored subjects. Duplicates are not filtered.
+
+**Arguments**:
+
+- `index`: name of the index (also called repository) in the GraphDB instance
+
+**Returns**:
+
+all subjects stored in the index
+
+<a name="graphdb.GraphDBKnowledgeGraph.get_all_predicates"></a>
+#### get\_all\_predicates
+
+```python
+ | get_all_predicates(index: Optional[str] = None)
+```
+
+Query the given index in the GraphDB instance for all its stored predicates. Duplicates are not filtered.
+
+**Arguments**:
+
+- `index`: name of the index (also called repository) in the GraphDB instance
+
+**Returns**:
+
+all predicates stored in the index
+
+<a name="graphdb.GraphDBKnowledgeGraph.get_all_objects"></a>
+#### get\_all\_objects
+
+```python
+ | get_all_objects(index: Optional[str] = None)
+```
+
+Query the given index in the GraphDB instance for all its stored objects. Duplicates are not filtered.
+
+**Arguments**:
+
+- `index`: name of the index (also called repository) in the GraphDB instance
+
+**Returns**:
+
+all objects stored in the index
+
+<a name="graphdb.GraphDBKnowledgeGraph.query"></a>
+#### query
+
+```python
+ | query(sparql_query: str, index: Optional[str] = None)
+```
+
+Execute a SPARQL query on the given index in the GraphDB instance
+
+**Arguments**:
+
+- `sparql_query`: SPARQL query that shall be executed
+- `index`: name of the index (also called repository) in the GraphDB instance
+
+**Returns**:
+
+query result
 
