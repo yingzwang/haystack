@@ -15,9 +15,8 @@ cd haystack
 pip install -r requirements.txt
 pip install -r requirements-dev.txt
 pip install -e .
-# install streamlit
-cd ui
-pip install -r requirements.txt
+python3 -c "import nltk;nltk.download('punkt')"
+cd ui; pip install -r requirements.txt
 ```
 
 #### Run Elasticsearch with GOT articles (optional)
