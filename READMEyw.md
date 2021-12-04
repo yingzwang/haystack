@@ -41,7 +41,7 @@ python ./demo_yw/init_document_store.py --doc_dir="./data/pdf"
 
 #### Run Haystack API
 ```bash
-gunicorn rest_api.application:app -b 0.0.0.0:8000 -k uvicorn.workers.UvicornWorker -t 300
+gunicorn rest_api.application:app -b 0.0.0.0 -k uvicorn.workers.UvicornWorker -t 300
 ```
 
 #### Start UI
