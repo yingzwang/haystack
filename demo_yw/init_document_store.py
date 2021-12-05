@@ -1,8 +1,8 @@
 import os
 from typing import Callable, Dict, List, Optional, Tuple, Union, Generator
-from haystack.document_store.elasticsearch import ElasticsearchDocumentStore
-from haystack.preprocessor.utils import convert_files_to_dicts
-from haystack.preprocessor import PreProcessor
+from haystack.document_stores.elasticsearch import ElasticsearchDocumentStore
+from haystack.utils.preprocessing import convert_files_to_dicts
+from haystack.nodes.preprocessor import PreProcessor
 from haystack.utils import launch_es
 from absl import app, flags, logging
 from absl.flags import FLAGS
@@ -17,9 +17,10 @@ def load_and_clean_documents(doc_dir: str):
     preprocessor = PreProcessor(
         clean_empty_lines=True,
         clean_whitespace=True,
-        clean_header_footer=False,
+        clean_header_footer=True,
         split_by="word",
-        split_length=100,
+        split_length=100, # original demo
+        # split_length=1000, # haystack official demo
         split_respect_sentence_boundary=True,
     )
     docs = preprocessor.process(raw_docs)
