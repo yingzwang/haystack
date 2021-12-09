@@ -24,6 +24,7 @@ cd ui; pip install -r requirements.txt
 docker run -dp 9200:9200 -e "discovery.type=single-node" deepset/elasticsearch-game-of-thrones
 ```
 
+---
 #### Run Elasticsearch with an empty instance
 ```bash
 docker run -dp 9200:9200 -e "discovery.type=single-node" elasticsearch:7.9.2
@@ -34,11 +35,6 @@ docker run -dp 9200:9200 -e "discovery.type=single-node" elasticsearch:7.9.2
 python ./demo_yw/init_document_store.py --doc_dir="./data/ziggo_wifi_en"
 ```
 
-#### Load documents to elasticsearch (demo 2: financial reports)
-```bash
-python ./demo_yw/init_document_store.py --doc_dir="./data/ziggo_pdf"
-```
-
 #### Run Haystack API
 ```bash
 gunicorn rest_api.application:app -b 0.0.0.0 -k uvicorn.workers.UvicornWorker --workers 1 --timeout 180
@@ -47,6 +43,17 @@ gunicorn rest_api.application:app -b 0.0.0.0 -k uvicorn.workers.UvicornWorker --
 #### Start UI
 ```bash
 streamlit run ./ui/webapp_ziggo.py
+```
+
+---
+#### Clear documents in elasticsearch (for demo 2)
+```bash
+python ./demo_yw/clear_document_store.py 
+```
+
+#### Load documents to elasticsearch (demo 2: financial reports)
+```bash
+python ./demo_yw/init_document_store.py --doc_dir="./data/ziggo_pdf"
 ```
 
 **Note**: We use following ports
