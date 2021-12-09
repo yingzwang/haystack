@@ -36,7 +36,7 @@ python ./demo_yw/init_document_store.py --doc_dir="./data/ziggo_wifi_en"
 
 #### Load documents to elasticsearch (demo 2: financial reports)
 ```bash
-python ./demo_yw/init_document_store.py --doc_dir="./data/pdf"
+python ./demo_yw/init_document_store.py --doc_dir="./data/ziggo_pdf"
 ```
 
 #### Run Haystack API
