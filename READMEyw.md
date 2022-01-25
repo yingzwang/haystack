@@ -46,11 +46,6 @@ streamlit run ./ui/webapp_ziggo.py
 ```
 
 ---
-#### Clear documents in elasticsearch (for demo 2)
-```bash
-python ./demo_yw/clear_document_store.py 
-```
-
 #### Load documents to elasticsearch (demo 2: financial reports)
 ```bash
 python ./demo_yw/init_document_store.py --doc_dir="./data/ziggo_pdf"

@@ -32,8 +32,10 @@ def main(_argv):
     FLAGS.doc_dir = os.path.expanduser(FLAGS.doc_dir)
     docs = load_and_clean_documents(doc_dir=FLAGS.doc_dir)
     document_store = ElasticsearchDocumentStore(host="localhost", username="", password="", index="document")
-    document_store.delete_documents()
+    document_store.delete_documents() # always clear the current store before adding documents
     document_store.write_documents(docs)
+    print(f"In document store: {document_store.get_document_count()} documents.")
+
 
 if __name__ == '__main__':
     try:
